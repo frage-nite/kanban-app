@@ -10,7 +10,8 @@ import {
   Layers,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Hash
 } from 'lucide-react';
 
 export default function BoardHeader({
@@ -18,6 +19,7 @@ export default function BoardHeader({
   activeBoard,
   onSelectBoard,
   onOpenCreateBoard,
+  onOpenSlackModal,
   searchQuery,
   onSearchChange,
   selectedTagFilter,
@@ -190,6 +192,16 @@ export default function BoardHeader({
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Board</span>
+          </button>
+
+          {/* Slack Integration Button */}
+          <button
+            onClick={onOpenSlackModal}
+            title="Configure Slack Notifications & Webhook"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl neu-btn-secondary text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-all"
+          >
+            <Hash className="w-4 h-4 text-emerald-600" />
+            <span className="hidden md:inline">Slack</span>
           </button>
 
           <button

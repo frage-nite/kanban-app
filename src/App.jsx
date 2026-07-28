@@ -3,7 +3,9 @@ import BoardHeader from './components/BoardHeader';
 import KanbanBoard from './components/KanbanBoard';
 import CardDetailModal from './components/CardDetailModal';
 import BoardModal from './components/BoardModal';
+import SlackModal from './components/SlackModal';
 import { loadInitialData, saveState, resetToDemoData } from './utils/storage';
+import { sendSlackNotification } from './utils/slack';
 
 export default function App() {
   const [data, setData] = useState(() => loadInitialData());
@@ -15,6 +17,7 @@ export default function App() {
 
   const [activeCardDetail, setActiveCardDetail] = useState(null);
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
+  const [isSlackModalOpen, setIsSlackModalOpen] = useState(false);
 
   // Sync to localStorage whenever state updates
   useEffect(() => {
@@ -88,7 +91,7 @@ export default function App() {
         b.id === activeBoard.id ? { ...b, lists: newLists } : b
       );
 
-      // Log movement in card activity
+      // Log movement in card activity & notify Slack
       const targetCard = cardsMap[draggableId];
       let updatedCardsMap = cardsMap;
       if (targetCard) {
@@ -103,6 +106,13 @@ export default function App() {
             activity: [...(targetCard.activity || []), activityItem]
           }
         };
+
+        sendSlackNotification({
+          eventType: 'cardMoved',
+          cardTitle: targetCard.title,
+          sourceList: sourceList.title,
+          destList: destList.title
+        });
       }
 
       setData((prev) => ({
@@ -184,12 +194,31 @@ export default function App() {
       boards: updatedBoards,
       cards: updatedCardsMap
     }));
+
+    const targetList = activeBoard?.lists.find((l) => l.id === listId);
+    sendSlackNotification({
+      eventType: 'cardCreated',
+      cardTitle: title,
+      listTitle: targetList?.title || 'List'
+    });
   };
 
   // Update Card Attributes
   const handleUpdateCard = (cardId, updates) => {
     const existing = cardsMap[cardId];
     if (!existing) return;
+
+    // Check if new comment was added
+    if (updates.comments && updates.comments.length > (existing.comments?.length || 0)) {
+      const latestComment = updates.comments[updates.comments.length - 1];
+      const authorMember = members.find((m) => m.id === latestComment.memberId);
+      sendSlackNotification({
+        eventType: 'commentAdded',
+        cardTitle: existing.title,
+        commentText: latestComment.text,
+        author: authorMember?.name || 'Team Member'
+      });
+    }
 
     const updatedCard = { ...existing, ...updates };
     const updatedCardsMap = { ...cardsMap, [cardId]: updatedCard };
@@ -321,6 +350,7 @@ export default function App() {
         activeBoard={activeBoard}
         onSelectBoard={(id) => setData((prev) => ({ ...prev, activeBoardId: id }))}
         onOpenCreateBoard={() => setIsCreateBoardOpen(true)}
+        onOpenSlackModal={() => setIsSlackModalOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedTagFilter={selectedTagFilter}
@@ -371,6 +401,13 @@ export default function App() {
         <BoardModal
           onClose={() => setIsCreateBoardOpen(false)}
           onCreateBoard={handleCreateBoard}
+        />
+      )}
+
+      {/* Slack Integration Modal */}
+      {isSlackModalOpen && (
+        <SlackModal
+          onClose={() => setIsSlackModalOpen(false)}
         />
       )}
     </div>
